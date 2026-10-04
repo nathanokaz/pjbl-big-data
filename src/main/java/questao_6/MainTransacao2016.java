@@ -1,5 +1,7 @@
 package questao_6;
 
+import java.io.File;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
@@ -7,109 +9,61 @@ import org.apache.hadoop.mapreduce.Job;
 import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
 import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
 
-import java.io.File;
+import util.MapReduceTextOutput;
 
+// Configura e executa a busca pelas transações mais caras e mais baratas do Brasil em 2016.
 public class MainTransacao2016 {
 
+    // Prepara o job, substitui a saída anterior e informa o resultado da execução.
     public static void main(String[] args) throws Exception {
-
         String input = "data/operacoes_comerciais_inteira.csv";
         String output = "output_transacao_2016";
 
+        // Configura a execução local do Hadoop.
         Configuration conf = new Configuration();
-
         conf.set("fs.defaultFS", "file:///");
         conf.set("mapreduce.framework.name", "local");
 
-        Job job = Job.getInstance(
-                conf,
-                "Transacao mais cara e mais barata do Brasil em 2016"
-        );
-
+        // Registra o mapper, combiner, reducer e os tipos usados pelo job.
+        Job job = Job.getInstance(conf, "Transacao mais cara e mais barata do Brasil em 2016");
         job.setJarByClass(MainTransacao2016.class);
-
-        // Mapper
         job.setMapperClass(TransacaoMapper.class);
-
-        // Combiner obrigatório
         job.setCombinerClass(TransacaoCombiner.class);
-
-        // Reducer
         job.setReducerClass(TransacaoReducer.class);
-
-        // Saída do Mapper
         job.setMapOutputKeyClass(Text.class);
         job.setMapOutputValueClass(TransacaoWritable.class);
-
-        // Saída final
         job.setOutputKeyClass(Text.class);
-        job.setOutputValueClass(Text.class);
+        job.setOutputValueClass(TransacaoWritable.class);
 
-        // Entrada
-        FileInputFormat.addInputPath(
-                job,
-                new Path(input)
-        );
+        // Define o arquivo CSV que será processado.
+        FileInputFormat.addInputPath(job, new Path(input));
 
-        // Remove output anterior
+        // Remove o diretório de saída anterior, se ele existir.
         File outputDirectory = new File(output);
-
+        MapReduceTextOutput.deleteTextFile(outputDirectory);
         if (outputDirectory.exists()) {
-            deleteDirectory(outputDirectory);
+            MapReduceTextOutput.deleteDirectory(outputDirectory);
         }
 
-        // Saída
-        FileOutputFormat.setOutputPath(
-                job,
-                new Path(output)
-        );
-
+        // Define onde o Hadoop gravará os resultados.
+        FileOutputFormat.setOutputPath(job, new Path(output));
         System.out.println("Iniciando MapReduce...");
-
         boolean sucesso = job.waitForCompletion(true);
 
+        // Mostra a conclusão do job e, em caso de falha, o motivo disponível.
         if (sucesso) {
-
             System.out.println();
             System.out.println("MapReduce executado com sucesso!");
-            System.out.println(
-                    "Resultado salvo em: " + output
-            );
-
+            System.out.println("Arquivo TXT: " + MapReduceTextOutput.writeTextFile(outputDirectory).getPath());
         } else {
-
             System.out.println();
             System.out.println("MapReduce falhou!");
 
+            // Exibe os detalhes quando o Hadoop fornece um status para o job.
             if (job.getStatus() != null) {
-
-                System.out.println(
-                        "Motivo: " +
-                                job.getStatus().getFailureInfo()
-                );
+                System.out.println("Motivo: " + job.getStatus().getFailureInfo());
             }
         }
     }
 
-    private static void deleteDirectory(File directory) {
-
-        File[] files = directory.listFiles();
-
-        if (files != null) {
-
-            for (File file : files) {
-
-                if (file.isDirectory()) {
-
-                    deleteDirectory(file);
-
-                } else {
-
-                    file.delete();
-                }
-            }
-        }
-
-        directory.delete();
-    }
 }
